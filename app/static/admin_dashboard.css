@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+body {
+    font-family: 'Poppins', Arial, sans-serif;
+    background: #fff;
+    margin: 0;
+    padding: 0;
+}
+h1 {
+    margin: 24px 0 16px 0;
+    font-size: 2em;
+}
+.section {
+    margin-bottom: 40px;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+}
+th {
+    background: #f0f0f0;
+}
+.form-inline input, .form-inline button {
+    margin-right: 10px;
+}
+#map {
+    height: 350px;
+    width: 100%;
+    margin-bottom: 30px;
+}
+.chart-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 30px auto;
+}
+#visitLogsModal {
+    display: none;
+    position: fixed;
+    top: 10%;
+    left: 10%;
+    width: 80%;
+    height: 70%;
+    background: #fff;
+    border: 2px solid #333;
+    overflow: auto;
+    z-index: 1000;
+    padding: 20px;
+}

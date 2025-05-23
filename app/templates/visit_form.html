@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tourist Visit Form</title>
+    <link rel="stylesheet" href="/static/visit_form.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+    // Try to get GPS location and autofill hidden fields
+    function autofillLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                document.getElementById('gps_lat').value = position.coords.latitude;
+                document.getElementById('gps_lng').value = position.coords.longitude;
+            });
+        }
+    }
+    window.onload = autofillLocation;
+    </script>
+</head>
+<body>
+    <h1>Tourist Visit Log</h1>
+    <div id="tourist-count" style="font-weight:600;margin-bottom:16px;"></div>
+    <form method="POST" id="visitForm">
+        {{ form.hidden_tag() }}
+        <p>
+            {{ form.name.label }}<br>
+            {{ form.name(size=32) }}
+        </p>
+        <p>
+            {{ form.email.label }}<br>
+            {{ form.email(size=32) }}
+        </p>
+        <p>
+            {{ form.nationality.label }}<br>
+            {{ form.nationality(size=32) }}
+        </p>
+        <p>
+            Landmark:<br>
+            <select name="landmark_id">
+                {% for landmark in landmarks %}
+                    <option value="{{ landmark.id }}" {% if landmark.id == selected_landmark_id %}selected{% endif %}>{{ landmark.name }}</option>
+                {% endfor %}
+            </select>
+        </p>
+        <p>
+            Number of Tourists:<br>
+            <input type="number" name="tourist_count" id="tourist_count" min="1" value="1" required style="width:80px;">
+        </p>
+        <input type="hidden" name="gps_lat" id="gps_lat">
+        <input type="hidden" name="gps_lng" id="gps_lng">
+        <p>{{ form.submit() }}</p>
+    </form>
+    <script>
+    // Fetch and display tourist count
+    fetch('/api/visits').then(r => r.json()).then(data => {
+        document.getElementById('tourist-count').innerText = `Total Tourists Checked In: ${data.length}`;
+    });
+    document.getElementById('visitForm').onsubmit = function(e) {
+        e.preventDefault();
+        var form = e.target;
+        var formData = new FormData(form);
+        fetch('', {
+            method: 'POST',
+            body: formData
+        }).then(r => {
+            Swal.fire({
+                icon: 'success',
+                title: 'Thank you!',
+                text: 'Your visit has been logged. This window will close automatically.',
+                timer: 5000,
+                timerProgressBar: true,
+                showConfirmButton: false
+            });
+            setTimeout(function() {
+                window.close();
+            }, 5000);
+        });
+    };
+    </script>
+</body>
+</html>

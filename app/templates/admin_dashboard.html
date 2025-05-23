@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - Tourist Monitoring System</title>
+    <link rel="stylesheet" href="/static/admin_dashboard.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <h1>Admin Dashboard - Tourist Monitoring System</h1>
+    <!-- Map and Chart Section -->
+    <div class="section">
+        <h2>Live Visitor Map & Trends</h2>
+        <div id="map"></div>
+        <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+    <!-- Add Landmark Section -->
+    <div class="section">
+        <h2>Add Landmark</h2>
+        <form id="addLandmarkForm" class="form-inline">
+            <input type="text" id="landmarkName" placeholder="Landmark Name" required>
+            <input type="text" id="landmarkLocation" placeholder="Location (lat,lng)" required>
+            <button type="submit">Add Landmark</button>
+        </form>
+        <div id="addLandmarkMsg"></div>
+    </div>
+    <!-- Landmarks and Visit Logs Section -->
+    <div class="section">
+        <h2>Landmarks & Visit Logs</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th>QR Code</th>
+                    <th>Visits</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="landmarksTable">
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+    </div>
+    <!-- General Tourist QR Code Section -->
+    <div class="section">
+        <h2>General Tourist QR Code</h2>
+        <a href="/qrcode" download>
+            <img src="/qrcode" alt="General Tourist QR Code" style="max-width:200px;display:block;margin-bottom:10px;" />
+        </a>
+        <p>Scan this QR code to check in at any landmark. Tourists will select their location from a dropdown.</p>
+    </div>
+    <!-- Visit Logs Modal -->
+    <div id="visitLogsModal" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:70%; background:#fff; border:2px solid #333; overflow:auto; z-index:1000; padding:20px;">
+        <h2>Visit Logs</h2>
+        <table style="width:100%">
+            <thead>
+                <tr><th>Timestamp</th><th>Tourist Info</th></tr>
+            </thead>
+            <tbody id="visitLogsTable"></tbody>
+        </table>
+        <button onclick="document.getElementById('visitLogsModal').style.display='none'">Close</button>
+    </div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    // Fetch landmarks and visits
+    let landmarks = [], visits = [];
+    function refreshData() {
+        Promise.all([
+            fetch('/api/landmarks').then(r => r.json()),
+            fetch('/api/visits').then(r => r.json())
+        ]).then(([l, v]) => {
+            landmarks = l; visits = v;
+            renderMap();
+            renderChart();
+            renderLandmarksTable();
+        });
+    }
+    // Map
+    function renderMap() {
+        if(window._map) { window._map.remove(); }
+        var map = L.map('map').setView([13.9414, 121.1631], 13);
+        window._map = map;
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+        var heatPoints = [];
+        landmarks.forEach(l => {
+            var loc = l.location.split(',').map(Number);
+            if(loc.length === 2) {
+                L.marker(loc).addTo(map).bindPopup(l.name);
+                var count = visits.filter(v => v.landmark_id === l.id).length;
+                for(let i=0; i<count; i++) heatPoints.push(loc);
+            }
+        });
+        heatPoints.forEach(pt => {
+            L.circle(pt, {radius: 50, color: 'red', fillOpacity: 0.2}).addTo(map);
+        });
+    }
+    // Chart
+    function renderChart() {
+        if(window._trendChart) window._trendChart.destroy();
+        var ctx = document.getElementById('trendChart').getContext('2d');
+        var dateCounts = {};
+        visits.forEach(v => {
+            var d = v.timestamp.split('T')[0];
+            dateCounts[d] = (dateCounts[d]||0)+1;
+        });
+        var labels = Object.keys(dateCounts).sort();
+        var data = labels.map(l => dateCounts[l]);
+        window._trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Visits per Day', data: data, borderColor: 'blue', fill: false }]
+            },
+            options: { responsive: true }
+        });
+    }
+    // Landmarks Table
+    function renderLandmarksTable() {
+        var tbody = document.getElementById('landmarksTable');
+        tbody.innerHTML = '';
+        landmarks.forEach(l => {
+            var count = visits.filter(v => v.landmark_id === l.id).length;
+            var tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="landmark-name" data-id="${l.id}">${l.name}</span></td>
+                <td><span class="landmark-location" data-id="${l.id}">${l.location}</span></td>
+                <td><a href="/landmark/${l.id}/qrcode" target="_blank">QR Code</a></td>
+                <td><a href="#" onclick="showVisitLogs(${l.id});return false;">${count} visits</a></td>
+                <td>
+                    <button onclick="editLandmark(${l.id})">Edit</button>
+                    <button onclick="deleteLandmark(${l.id})">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    // Edit Landmark (with modal and SweetAlert)
+    function editLandmark(id) {
+        const landmark = landmarks.find(l => l.id === id);
+        Swal.fire({
+            title: 'Edit Landmark',
+            html: `
+                <input id="swal-name" class="swal2-input" placeholder="Name" value="${landmark.name}">
+                <input id="swal-location" class="swal2-input" placeholder="Location (lat,lng)" value="${landmark.location}">
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Save',
+            preConfirm: () => {
+                return {
+                    name: document.getElementById('swal-name').value,
+                    location: document.getElementById('swal-location').value
+                };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch(`/landmark/${id}/edit`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `name=${encodeURIComponent(result.value.name)}&location=${encodeURIComponent(result.value.location)}`
+                }).then(() => {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Saved!',
+                        text: 'Landmark updated successfully.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    refreshData();
+                });
+            }
+        });
+    }
+    // Delete Landmark (with SweetAlert confirm)
+    function deleteLandmark(id) {
+        Swal.fire({
+            title: 'Delete Landmark?',
+            text: 'Are you sure you want to delete this landmark?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch(`/landmark/${id}/delete`, { method: 'POST' }).then(() => {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Deleted!',
+                        text: 'Landmark deleted successfully.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    refreshData();
+                });
+            }
+        });
+    }
+    // Visit Logs Modal
+    function showVisitLogs(landmarkId) {
+        var modal = document.getElementById('visitLogsModal');
+        var tbody = document.getElementById('visitLogsTable');
+        tbody.innerHTML = '';
+        var logs = visits.filter(v => v.landmark_id === landmarkId);
+        logs.forEach(v => {
+            var tr = document.createElement('tr');
+            tr.innerHTML = `<td>${v.timestamp.replace('T',' ').slice(0,19)}</td><td>${v.tourist_info||''}</td>`;
+            tbody.appendChild(tr);
+        });
+        modal.style.display = 'block';
+    }
+    // Add Landmark
+    document.getElementById('addLandmarkForm').onsubmit = function(e) {
+        e.preventDefault();
+        var name = document.getElementById('landmarkName').value.trim();
+        var location = document.getElementById('landmarkLocation').value.trim();
+        fetch('/landmark/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `name=${encodeURIComponent(name)}&location=${encodeURIComponent(location)}`
+        }).then(r => r.text()).then(() => {
+            Swal.fire({
+                icon: 'success',
+                title: 'Added!',
+                text: 'Landmark added successfully.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            document.getElementById('addLandmarkForm').reset();
+            setTimeout(()=>{document.getElementById('addLandmarkMsg').innerText='';}, 2000);
+            refreshData();
+        });
+    };
+    // Initial load
+    refreshData();
+    </script>
+</body>
+</html>

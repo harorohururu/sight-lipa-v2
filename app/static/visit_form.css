@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+body {
+    font-family: 'Poppins', Arial, sans-serif;
+    background: #fff;
+    margin: 0;
+    padding: 0;
+}
+h1 {
+    margin: 24px 0 16px 0;
+    font-size: 2em;
+}
+form {
+    margin: 24px 0;
+}
+input[type="text"], select {
+    width: 250px;
+    padding: 6px;
+    margin-bottom: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+input[type="submit"], button {
+    padding: 6px 16px;
+    border: none;
+    background: #1976d2;
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+}
+input[type="submit"]:hover, button:hover {
+    background: #125ea2;
+}
